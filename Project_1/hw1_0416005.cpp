@@ -15,7 +15,6 @@ using namespace std;
 #define FINISH_MESSAGE "finish playing"
 
 int guarantee_number;
-unsigned int time_counter;
 unsigned int number_of_players;
 typedef struct user_info {
   unsigned int id;
