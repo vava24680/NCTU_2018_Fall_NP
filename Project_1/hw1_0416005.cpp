@@ -23,32 +23,52 @@ typedef struct user_info {
   unsigned int rest_time;
   unsigned int total_play_rounds;
 } USER_INFO;
+// Record how many players have got their prize
 unsigned int number_of_finished_players;
+// Global time counter
 int global_timer;
+// Guarantee number countdown counter
 int guarantee_number_counter;
+// Store "YES" and "NO" strings
 vector<string> yes_no_string_list;
 // Store each player next arrive time, index is player id
 vector<unsigned int> arrive_time;
+// Indicate if the claw machine is playing or not
 bool is_playing;
+// Indicate is the current player is done or not
 bool current_player_done;
+// Record the if of the player who is currently playing
 unsigned int player_id;
+// Flag used by master thread for informing all player threads can detach
 bool can_detach;
 
-/* Shared with all player threads */
+// Shared with all player threads
 queue<unsigned int> waiting_queue;
+// Semaphore used by each player thread and master thread
+// as a lock for shared resource waiting_queue
 sem_t* waiting_queue_write_mutex;
 
-/* Data that transfer to master thread */
+// Data that transfer to master thread
 typedef struct master_thread_data {
   USER_INFO* user_info_array;
 } MASTER_THREAD_DATA;
 
+// Semaphore used by each player thread as a lock for shared IO resource
 sem_t* io_mutex;
+// Semaphores used by master thread for waking up each player thread
 sem_t* player_start_sem_array;
+// Semaphores used by each player thread for informing the master thread
+// that it has done its task in one timeslot
 sem_t* player_done_sem_array;
+// Semaphore used by each player thread for ensuring the finish messages
+// is printed before any start/wait messgaes
 sem_t* msg_order_sem;
+// Semaphore used by main routine to inform master thread can start its routine
 sem_t* all_start_sem;
+// Semaphore used by master thread to inform main routine that all players have
+// got their prize
 sem_t* all_complete_sem;
+// vector for storing all thread id
 vector<pthread_t> thread_array;
 
 bool compare_function_with_arrive_time(const USER_INFO &first, const USER_INFO &second) {
