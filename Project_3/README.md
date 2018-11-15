@@ -4,6 +4,7 @@
   * 若使用的compiler名稱並非`clang++`或使用`g++`，請將兩個Makefile內的`CPP`變數更改為相對應的compiler program name
 * [Botan library](https://github.com/randombit/botan)
 * [MongoDB C++ Driver](http://mongocxx.org/)
+* [JSON for Modern C++](https://github.com/nlohmann/json)
 * MongoDB with user management
 
 ### Pre-setup
