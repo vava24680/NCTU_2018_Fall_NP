@@ -24,7 +24,8 @@ compile: main.o server.o
 	$(CPP) \
 		$(MONGOCXX_DRIVER_COMPILE_OPTIONS) \
 		$(BOTAN_COMPILE_OPTIONS) \
-		-o $(EXECUTABLE_FILE) $^
+		-o server.out \
+		$^
 
 clean:
-	rm *.o
+	rm *.o *.out
