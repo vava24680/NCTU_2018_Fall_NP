@@ -1,6 +1,7 @@
 ## 說明
 ### Requirement
-* C++ compiler with C++11 support (`clang`/`g++` is ok)
+* C++ compiler with C++11 support (`clang++`/`g++` is ok)
+  * 若使用的compiler名稱並非`clang++`或使用`g++`，請將兩個Makefile內的`CPP`變數更改為相對應的compiler program name
 * [Botan library](https://github.com/randombit/botan)
 * [MongoDB C++ Driver](http://mongocxx.org/)
 * MongoDB with user management
