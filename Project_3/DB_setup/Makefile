@@ -22,7 +22,7 @@ compile: main.o database.o
 		$(COMMON_COMPILE_OPTIONS) \
 		$(MONGOCXX_DRIVER_COMPILE_OPTIONS) \
 		$^ \
-		-o db_pre_setup.out
+		-o db_setup.out
 
 clean:
 	rm *.out *.o
