@@ -12,26 +12,26 @@ BOTAN_COMPILE_OPTIONS=$(shell pkg-config --cflags botan-2)
 
 server.o: $(SERVER_CPP_FILE) $(SERVER_HPP_FILE)
 	$(CPP) \
+		$< \
 		$(COMMON_COMPILE_OPTIONS) \
 		$(MONGOCXX_DRIVER_COMPILE_OPTIONS) \
 		$(BOTAN_COMPILE_OPTIONS) \
-		$< \
 		-c
 
 main.o: $(SOURCE_FILE)
 	$(CPP) \
+		$^ \
 		$(COMMON_COMPILE_OPTIONS) \
 		$(MONGOCXX_DRIVER_COMPILE_OPTIONS) \
 		$(BOTAN_COMPILE_OPTIONS) \
-		$^ \
 		-c -o $@
 
 compile: main.o server.o
 	$(CPP) \
+		$^ \
 		$(BOTAN_LINKING_OPTIONS) \
 		$(MONGOCXX_DRIVER_LINKING_OPTIONS) \
 		-o server.out \
-		$^
 
 clean:
 	rm *.o *.out
