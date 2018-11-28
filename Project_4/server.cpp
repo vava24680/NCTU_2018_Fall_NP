@@ -273,6 +273,17 @@ bool Server::AddNewUser(T user_name, T password) {
   return insert_one_result ? true : false;
 }
 
+template <class T>
+bool Server::AddNewGroup(T group_name, bool is_public) {
+  auto group_document = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "public" << is_public
+      << bsoncxx::builder::stream::finalize;
+  auto insert_one_result = groups_collection_.insert_one(
+      group_document.view());
+  return insert_one_result ? true : false;
+}
+
 template <class T, class U>
 bool Server::AddNewLoginRecord(T user_name, U token) {
   auto login_user_document = bsoncxx::builder::stream::document()
@@ -403,6 +414,16 @@ bool Server::DeleteUser(T user_name) {
       << bsoncxx::builder::stream::finalize;
   auto deletion_result = users_collection_.delete_one(
       user_deletion_filter.view());
+  return deletion_result->deleted_count() ? true : false;
+}
+
+template <class T>
+bool Server::DeleteOneGroup(T group_name) {
+  auto group_deletion_filter = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << bsoncxx::builder::stream::finalize;
+  auto deletion_result = groups_collection_.delete_one(
+      group_deletion_filter.view());
   return deletion_result->deleted_count() ? true : false;
 }
 

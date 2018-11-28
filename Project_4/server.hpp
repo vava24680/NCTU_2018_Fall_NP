@@ -97,6 +97,8 @@ class Server {
     void CreateCollection(const string& collection_name);
     template <class T>
       bool AddNewUser(T user_name, T password);
+    template <class T>
+      bool AddNewGroup(T group_name, bool is_public);
     template <class T, class U>
       bool AddNewLoginRecord(T user_name, U password);
     template <class T, class U>
@@ -107,6 +109,8 @@ class Server {
       bool AddNewPost(T user_name, U message);
     template <class T>
       bool DeleteUser(T user_name);
+    template <class T>
+      bool DeleteOneGroup(T group_name);
     template <class T>
       bool DeleteLoginRecordByUsername(T user_name);
     template <class T>
