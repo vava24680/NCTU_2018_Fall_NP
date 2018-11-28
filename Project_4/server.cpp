@@ -89,11 +89,15 @@ void Server::Initial(void) {
       });
   mongodb_database = mongodb_client[MONGODB_DATABASE];
   CreateCollection(USERS_COLLECTION);
+  CreateCollection(GROUPS_COLLECTION);
+  CreateCollection(JOINED_GROUPS_COLLECTION);
   CreateCollection(LOGIN_USERS_COLLECTION);
   CreateCollection(INVITATIONS_COLLECTION);
   CreateCollection(FRIENDSHIPS_COLLECTION);
   CreateCollection(POSTS_COLLECTION);
   users_collection_ = mongodb_database[USERS_COLLECTION];
+  groups_collection_ = mongodb_database[GROUPS_COLLECTION];
+  joined_groups_collection_ = mongodb_database[JOINED_GROUPS_COLLECTION];
   login_users_collection_ = mongodb_database[LOGIN_USERS_COLLECTION];
   invitations_collection_ = mongodb_database[INVITATIONS_COLLECTION];
   friendships_collection_ = mongodb_database[FRIENDSHIPS_COLLECTION];

@@ -65,6 +65,8 @@ class Server {
     mongocxx::client mongodb_client;
     mongocxx::database mongodb_database;
     mongocxx::collection users_collection_;
+    mongocxx::collection groups_collection_;
+    mongocxx::collection joined_groups_collection_;
     mongocxx::collection login_users_collection_;
     mongocxx::collection invitations_collection_;
     mongocxx::collection friendships_collection_;
