@@ -32,6 +32,8 @@
 #include "nlohmann/json.hpp"
 
 #define USERS_COLLECTION "Users"
+#define GROUPS_COLLECTION "Groups"
+#define JOINED_GROUPS_COLLECTION "JoinedGroups"
 #define LOGIN_USERS_COLLECTION "LoginUsers"
 #define INVITATIONS_COLLECTION "Invitations"
 #define FRIENDSHIPS_COLLECTION "Friendships"
@@ -51,6 +53,12 @@
 #define INVITE 7
 #define ACCEPT_INVITE 8
 #define POST 9
+#define SEND 10
+#define CREATE_GROUP 11
+#define LIST_GROUP 12
+#define LIST_JOINED 13
+#define JOIN_GROUP 14
+#define SEND_GROUP 15
 
 #define SUCCESS_MESSAGE "Success!"
 #define NOT_LOGIN_MESSAGE "Not login yet"
@@ -817,6 +825,30 @@ void Server::Post(char* instruction) {
     InvalidInstructionFormatMessagePrinter();
     response_object["message"] = "Usage: post <user> <message>";
   }
+}
+
+void Send(char* instruction) {
+
+}
+
+void CreateGroup(char* instruction) {
+
+}
+
+void ListGroup(char* instruction) {
+
+}
+
+void ListJoined(char* instruction) {
+
+}
+
+void JoinGroup(char* instruction) {
+
+}
+
+void SendGroup(char* instruction) {
+
 }
 
 void Server::MessageParsing(char* instruction, const time_t& now) {
