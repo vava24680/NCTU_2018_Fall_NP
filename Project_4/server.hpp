@@ -146,6 +146,12 @@ class Server {
     void Invite(char* instruction);
     void AcceptInvite(char* instruction);
     void Post(char* instruction);
+    void Send(char* instruction);
+    void CreateGroup(char* instruction);
+    void ListGroup(char* instruction);
+    void ListJoined(char* instruction);
+    void JoinGroup(char* instruction);
+    void SendGroup(char* instruction);
     void MessageParsing(char* instruction, const time_t& now);
 };
 #endif
