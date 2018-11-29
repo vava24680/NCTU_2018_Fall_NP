@@ -85,7 +85,13 @@ void Server::Initial(void) {
       {"receive-post", RECEIVE_POST},
       {"invite", INVITE},
       {"accept-invite", ACCEPT_INVITE},
-      {"post", POST}
+      {"post", POST},
+      {"send", SEND},
+      {"create-group", CREATE_GROUP},
+      {"list-group", LIST_GROUP},
+      {"list-joined", LIST_JOINED},
+      {"list-group", LIST_GROUP},
+      {"send-group", SEND_GROUP}
       });
   mongodb_database = mongodb_client[MONGODB_DATABASE];
   CreateCollection(USERS_COLLECTION);
@@ -156,13 +162,23 @@ void Server::GetToken(const char* const instruction, string& token) {
 }
 
 template<class T>
-bool Server::CheckLogin(T token) {
+bool Server::CheckTokenExists(T token) {
   auto login_users_query_filter = bsoncxx::builder::stream::document()
       << "token" << token
       << bsoncxx::builder::stream::finalize;
   login_user_view_ = login_users_collection_.find_one(
       login_users_query_filter.view());
   return login_user_view_ && !token.empty() ? true : false;
+}
+
+template<class T>
+bool Server::CheckLoginByUsername(T user_name) {
+  auto login_user_query_filter = bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto login_user_query_result = login_users_collection_.find_one(
+      login_user_query_filter.view());
+  return (login_user_query_result) ? true : false;
 }
 
 template <class T>
@@ -172,6 +188,16 @@ bool Server::CheckUserExists(T user_name) {
       << bsoncxx::builder::stream::finalize;
   auto user_query_result = users_collection_.find_one(user_query_filter.view());
   return (user_query_result) ? true : false;
+}
+
+template<class T>
+bool Server::CheckGroupExists(T group_name) {
+  auto group_query_filter = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << bsoncxx::builder::stream::finalize;
+  auto group_query_result = groups_collection_.find_one(
+      group_query_filter.view());
+  return (group_query_result) ? true : false;
 }
 
 template <class T, class U>
@@ -573,7 +599,7 @@ void Server::Delete(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -600,7 +626,7 @@ void Server::Logout(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -623,7 +649,7 @@ void Server::ListInvite(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -653,7 +679,7 @@ void Server::ListFriend(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")) {
     AfterLoginValidatedHandler();
@@ -693,7 +719,7 @@ void Server::ReceivePost(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")) {
     AfterLoginValidatedHandler();
@@ -746,7 +772,7 @@ void Server::Invite(char* instruction) {
   strtok(instruction, " ") ? token.assign(instruction, strlen(instruction)) : token;
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else {
     AfterLoginValidatedHandler();
@@ -799,7 +825,7 @@ void Server::AcceptInvite(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else {
     AfterLoginValidatedHandler();
@@ -834,7 +860,7 @@ void Server::Post(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (instruction_length != token.length()) {
     AfterLoginValidatedHandler();
@@ -852,27 +878,92 @@ void Server::Post(char* instruction) {
   }
 }
 
-void Send(char* instruction) {
+void Server::Send(char* instruction) {
+  cout << "In Send function" << endl;
+  string token("");
+  string message__;
+  string user_name;
+  string friend_name;
+  char* friend_name_in_c_string = NULL;
+  char* message_in_c_string = NULL;
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  friend_name_in_c_string = strtok(NULL, " ");
+  message_in_c_string = strtok(NULL, " ");
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists(token)) {
+    NotLoginHandler();
+  } else if ((!friend_name_in_c_string) || (!message_in_c_string)) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: send <user> <friend> <message>";
+  } else if (!CheckUserExists<string>(string(friend_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = "No such user exist";
+  } else {
+    GetUsername(user_name);
+    if (!CheckFriendshipExists<string, string>(user_name,
+        string(friend_name_in_c_string))) {
+      AfterLoginValidatedHandler();
+      response_object["message"] = string(friend_name_in_c_string)
+          + " is not your friend";
+    } else if(!CheckLoginByUsername<string>(string(friend_name_in_c_string))) {
+      AfterLoginValidatedHandler();
+      response_object["message"] = string(friend_name_in_c_string)
+          + " is not online";
+    } else {
+      AfterLoginValidatedHandler();
+      message__.assign(message_in_c_string, strlen(message_in_c_string));
+      cout << message__ << endl;
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+      // Should pass message to MQ
+    }
+  }
+}
+
+void Server::CreateGroup(char* instruction) {
+  cout << "In Send function" << endl;
+  string token("");
+  char* group_name_in_c_string = NULL;
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  group_name_in_c_string = strtok(NULL, " ");
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (!group_name_in_c_string || strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: create-group <user> <group>";
+  } else if (CheckGroupExists<string>(string(group_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = string(group_name_in_c_string)
+        + " already exist";
+  } else {
+    AfterLoginValidatedHandler();
+    AddNewGroup<string>(string(group_name_in_c_string), true);
+    response_object["message"] = SUCCESS_MESSAGE;
+  }
+}
+
+void Server::ListGroup(char* instruction) {
 
 }
 
-void CreateGroup(char* instruction) {
+void Server::ListJoined(char* instruction) {
 
 }
 
-void ListGroup(char* instruction) {
+void Server::JoinGroup(char* instruction) {
 
 }
 
-void ListJoined(char* instruction) {
-
-}
-
-void JoinGroup(char* instruction) {
-
-}
-
-void SendGroup(char* instruction) {
+void Server::SendGroup(char* instruction) {
 
 }
 
@@ -918,6 +1009,24 @@ void Server::MessageParsing(char* instruction, const time_t& now) {
         break;
       case POST:
         Post(instruction + strlen(command) + 1);
+        break;
+      case SEND:
+        Send(instruction + strlen(command) + 1);
+        break;
+      case CREATE_GROUP:
+        CreateGroup(instruction + strlen(command) + 1);
+        break;
+      case LIST_GROUP:
+        ListGroup(instruction + strlen(command) + 1);
+        break;
+      case LIST_JOINED:
+        ListJoined(instruction + strlen(command) + 1);
+        break;
+      case JOIN_GROUP:
+        JoinGroup(instruction + strlen(command) + 1);
+        break;
+      case SEND_GROUP:
+        SendGroup(instruction + strlen(command) + 1);
         break;
       default:
         cout << "Unrecognized command" << endl;

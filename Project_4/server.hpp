@@ -79,9 +79,13 @@ class Server {
     string GetTimeStamp(const time_t& now);
     void GetToken(const char* const instruction, string& token);
     template<class T>
-      bool CheckLogin(T token);
+      bool CheckTokenExists(T token);
+    template<class T>
+      bool CheckLoginByUsername(T user_name);
     template <class T>
       bool CheckUserExists(T user_name);
+    template <class T>
+      bool CheckGroupExists(T group_name);
     template <class T, class U>
       bool CheckInvitationExists(T inviter_user_name, U invitee_user_name);
     template <class T, class U>
