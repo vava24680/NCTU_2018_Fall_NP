@@ -363,6 +363,20 @@ bsoncxx::stdx::optional<bsoncxx::document::value> Server::GetUser(
   return users_collection_.find_one(user_query_filter.view());
 }
 
+mongocxx::cursor Server::GetAllPublicGroups(void) {
+  auto public_groups_query_filter = bsoncxx::builder::stream::document()
+      << "public" << true
+      << bsoncxx::builder::stream::finalize;
+  return groups_collection_.find(public_groups_query_filter.view());
+}
+
+mongocxx::cursor Server::GetAllPrivateGroups(void) {
+  auto private_groups_query_filter = bsoncxx::builder::stream::document()
+      << "public" << false
+      << bsoncxx::builder::stream::finalize;
+  return groups_collection_.find(private_groups_query_filter.view());
+}
+
 template <class T>
 bsoncxx::stdx::optional<bsoncxx::document::value> Server::GetLoginUserByUsername(
     T user_name) {
@@ -927,7 +941,7 @@ void Server::Send(char* instruction) {
 }
 
 void Server::CreateGroup(char* instruction) {
-  cout << "In Send function" << endl;
+  cout << "In CreateGroup function" << endl;
   string token("");
   char* group_name_in_c_string = NULL;
 
@@ -954,7 +968,30 @@ void Server::CreateGroup(char* instruction) {
 }
 
 void Server::ListGroup(char* instruction) {
+  cout << "In ListGroup function" << endl;
+  string token("");
 
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: list-group <user>";
+  } else {
+    JSON public_groups_array = JSON::array();
+    auto public_groups_query_result_cursor = GetAllPublicGroups();
+    response_object["status"] = 1;
+    for(auto&& public_group_document_view : public_groups_query_result_cursor) {
+      public_groups_array.push_back(
+          public_group_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["all-groups"] = public_groups_array;
+  }
 }
 
 void Server::ListJoined(char* instruction) {
