@@ -131,6 +131,8 @@ class Server {
     template <class T>
       bsoncxx::stdx::optional<bsoncxx::document::value> GetUser(
           T user_name);
+    mongocxx::cursor GetAllPublicGroups(void);
+    mongocxx::cursor GetAllPrivateGroups(void);
     template <class T>
       bsoncxx::stdx::optional<bsoncxx::document::value> GetLoginUserByUsername(
           T user_name);
