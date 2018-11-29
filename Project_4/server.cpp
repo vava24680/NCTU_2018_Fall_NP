@@ -547,10 +547,12 @@ void Server::Register(char* instruction) {
     response_object["message"] = "Usage: register <id> <password>";
   } else if (CheckUserExists<const char* const>(user_name)) {
     response_object["message"] = string(user_name) + " is already used";
-  } else if(AddNewUser<const char* const>(user_name, password)) {
+  } else {
+    AddNewUser<const char* const>(user_name, password);
+    AddNewGroup<const char* const>(user_name, false);
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
-  } else {}
+  }
 }
 
 void Server::Login(char* instruction, const time_t& now) {
