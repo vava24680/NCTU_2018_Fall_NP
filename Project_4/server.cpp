@@ -90,7 +90,7 @@ void Server::Initial(void) {
       {"create-group", CREATE_GROUP},
       {"list-group", LIST_GROUP},
       {"list-joined", LIST_JOINED},
-      {"list-group", LIST_GROUP},
+      {"join-group", JOIN_GROUP},
       {"send-group", SEND_GROUP}
       });
   mongodb_database = mongodb_client[MONGODB_DATABASE];
@@ -201,6 +201,18 @@ bool Server::CheckGroupExists(T group_name) {
 }
 
 template <class T, class U>
+bool Server::CheckJoinedGroupRelationshipExists(T group_name, U user_name) {
+  auto joined_group_relationship_query_filter
+      = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto joined_group_relationship_query_result = joined_groups_collection_
+      .find_one(joined_group_relationship_query_filter.view());
+  return (joined_group_relationship_query_result) ? true : false;
+}
+
+template <class T, class U>
 bool Server::CheckInvitationExists(T inviter_user_name, U invitee_user_name) {
   auto invitation_query_filter = bsoncxx::builder::stream::document()
       << "inviter" << inviter_user_name
@@ -307,6 +319,17 @@ bool Server::AddNewGroup(T group_name, bool is_public) {
       << bsoncxx::builder::stream::finalize;
   auto insert_one_result = groups_collection_.insert_one(
       group_document.view());
+  return insert_one_result ? true : false;
+}
+
+template <class T, class U>
+bool Server::AddNewJoinedGroupRecord(T group_name, U user_name) {
+  auto joined_group_document = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto insert_one_result = joined_groups_collection_.insert_one(
+      joined_group_document.view());
   return insert_one_result ? true : false;
 }
 
@@ -999,7 +1022,41 @@ void Server::ListJoined(char* instruction) {
 }
 
 void Server::JoinGroup(char* instruction) {
+  cout << "In JoinGroup function" << endl;
+  string token("");
+  string user_name("");
+  char* group_name_in_c_string = NULL;
 
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  group_name_in_c_string = strtok(NULL, " ");
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ") || !group_name_in_c_string) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: join-group <user> <group>";
+  } else if (!CheckGroupExists<string>(string(group_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = string(group_name_in_c_string)
+        + " does not exist";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    if (CheckJoinedGroupRelationshipExists<string, string>(
+          string(group_name_in_c_string), user_name)) {
+      response_object["message"] = "Already a member of "
+          + string(group_name_in_c_string);
+    } else {
+      AddNewJoinedGroupRecord<string, string>(
+          string(group_name_in_c_string), user_name);
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+      response_object["topic"] = string(group_name_in_c_string);
+    }
+  }
 }
 
 void Server::SendGroup(char* instruction) {

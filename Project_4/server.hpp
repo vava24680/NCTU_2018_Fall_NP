@@ -87,6 +87,8 @@ class Server {
     template <class T>
       bool CheckGroupExists(T group_name);
     template <class T, class U>
+      bool CheckJoinedGroupRelationshipExists(T group_name, U user_name);
+    template <class T, class U>
       bool CheckInvitationExists(T inviter_user_name, U invitee_user_name);
     template <class T, class U>
       bool CheckFriendshipExists(T user_name_1, U user_name_2);
@@ -103,6 +105,8 @@ class Server {
       bool AddNewUser(T user_name, T password);
     template <class T>
       bool AddNewGroup(T group_name, bool is_public);
+    template <class T, class U>
+      bool AddNewJoinedGroupRecord(T group_name, U user_name);
     template <class T, class U>
       bool AddNewLoginRecord(T user_name, U password);
     template <class T, class U>
