@@ -986,6 +986,7 @@ void Server::CreateGroup(char* instruction) {
   } else {
     AfterLoginValidatedHandler();
     AddNewGroup<string>(string(group_name_in_c_string), true);
+    response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
   }
 }
@@ -1007,7 +1008,7 @@ void Server::ListGroup(char* instruction) {
   } else {
     JSON public_groups_array = JSON::array();
     auto public_groups_query_result_cursor = GetAllPublicGroups();
-    response_object["status"] = 1;
+    response_object["status"] = 0;
     for(auto&& public_group_document_view : public_groups_query_result_cursor) {
       public_groups_array.push_back(
           public_group_document_view["group_name"].get_utf8()
