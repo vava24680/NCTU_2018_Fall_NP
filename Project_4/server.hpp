@@ -138,6 +138,8 @@ class Server {
     mongocxx::cursor GetAllPublicGroups(void);
     mongocxx::cursor GetAllPrivateGroups(void);
     template <class T>
+      mongocxx::cursor GetAllJoinedGroupsOfUser(T user_name);
+    template <class T>
       bsoncxx::stdx::optional<bsoncxx::document::value> GetLoginUserByUsername(
           T user_name);
     template <class T>
