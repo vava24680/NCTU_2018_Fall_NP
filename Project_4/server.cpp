@@ -401,6 +401,14 @@ mongocxx::cursor Server::GetAllPrivateGroups(void) {
 }
 
 template <class T>
+mongocxx::cursor Server::GetAllJoinedGroupsOfUser(T user_name) {
+  auto joined_groups_query_filter = bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  return joined_groups_collection_.find(joined_groups_query_filter.view());
+}
+
+template <class T>
 bsoncxx::stdx::optional<bsoncxx::document::value> Server::GetLoginUserByUsername(
     T user_name) {
   auto login_user_query_filter = bsoncxx::builder::stream::document()
@@ -1019,7 +1027,34 @@ void Server::ListGroup(char* instruction) {
 }
 
 void Server::ListJoined(char* instruction) {
+  cout << "In ListJoined function" << endl;
+  string token("");
+  string user_name("");
 
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: list-joined <user>";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    JSON joined_topics_array = JSON::array();
+    auto joined_topics_query_result_cursor = GetAllJoinedGroupsOfUser<string>(
+        user_name);
+    response_object["status"] = 0;
+    for(auto&& joined_topic_document_view : joined_topics_query_result_cursor) {
+      joined_topics_array.push_back(
+          joined_topic_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["all-joined-topics"] = joined_topics_array;
+  }
 }
 
 void Server::JoinGroup(char* instruction) {
