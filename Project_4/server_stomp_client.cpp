@@ -2,8 +2,10 @@
 #include <iostream>
 #include <cstdio>
 #include "server_stomp_client.hpp"
+#include "nlohmann/json.hpp"
 
 using namespace std;
+using JSON = nlohmann::json;
 
 ServerStompClient::ServerStompClient() {};
 ServerStompClient::ServerStompClient(string IP, unsigned int port) {
@@ -43,6 +45,24 @@ void ServerStompClient::Run() {
   } catch (const cms::CMSException cms_exception) {
     cms_exception.printStackTrace();
   }
+}
+
+string ServerStompClient::ContructsMessagePayloadForQueue(
+    const string& sender, const string& receiver,const string& message) {
+  JSON payload = JSON::object({
+      {"sender", sender},
+      {"receiver", receiver},
+      {"message", message}});
+  return payload.dump();
+}
+
+string ServerStompClient::ConstructMessagePayloadForTopic(
+    const string& sender, const string& topic, const string& message) {
+  JSON payload = JSON::object({
+      {"sender", sender},
+      {"topic", topic},
+      {"message", message}});
+  return payload.dump();
 }
 
 bool ServerStompClient::PublishMessageToOneQueue(string sender, string receiver,

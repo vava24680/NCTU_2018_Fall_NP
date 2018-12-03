@@ -32,6 +32,13 @@ class ServerStompClient {
         string message);
     bool PublishMessageToOneQueue(string sender, string receiver,
         string message);
+  public:
+    static string ContructsMessagePayloadForQueue(const string& sender,
+                                                  const string& receiver,
+                                                  const string& message);
+    static string ConstructMessagePayloadForTopic(const string& sender,
+                                                  const string& topic,
+                                                  const string& message);
   private:
     string mq_server_IP_;
     unsigned int port_;
