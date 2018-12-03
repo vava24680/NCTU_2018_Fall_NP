@@ -108,6 +108,8 @@ void Server::Initial(void) {
   invitations_collection_ = mongodb_database[INVITATIONS_COLLECTION];
   friendships_collection_ = mongodb_database[FRIENDSHIPS_COLLECTION];
   posts_collection_ = mongodb_database[POSTS_COLLECTION];
+
+  stomp_client.Run();
 }
 
 void Server::SendResponse(int* client_socket_file_descriptor) {
@@ -1205,8 +1207,10 @@ Server::Server(const char* IP__, const char* port__)
   Initial();
 }
 
-Server::Server(const string& IP, const int port)
-    : blake2b_hash_{BLAKE2B_DIGEST_LENGTH},
+Server::Server(const string& IP, const unsigned int& port, const string& mq_ip,
+               const unsigned int& mq_port) :
+    stomp_client{mq_ip, mq_port},
+    blake2b_hash_{BLAKE2B_DIGEST_LENGTH},
     mongodb_instance{},
     mongodb_client{mongocxx::uri{MONGODB_URL}}
   {
