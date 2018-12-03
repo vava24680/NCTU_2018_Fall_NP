@@ -621,18 +621,29 @@ void Server::Login(char* instruction, const time_t& now) {
         user_query_result->view(), password)) {
     cout << "Password didn't match" << endl;
     response_object["message"] = "No such user or password error";
-  } else if ((login_user_query_result =
-        GetLoginUserByUsername<const char* const>(user_name))) {
-    response_object["status"] = 0;
-    response_object["message"] = SUCCESS_MESSAGE;
-    response_object["token"] = 
-        login_user_query_result->view()["token"].get_utf8().value.to_string();
   } else {
-    token.assign(GenerateToken(string(user_name) + GetTimeStamp(now)));
-    AddNewLoginRecord<const char* const, const string&>(user_name, token);
+    JSON queues_array = JSON::array({string(user_name)});
+    JSON topics_array = JSON::array();
+    auto joined_topics_query_result_cursor = GetAllJoinedGroupsOfUser<string>(
+        string(user_name));
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
-    response_object["token"] = token;
+    for(auto joined_topic_document_view : joined_topics_query_result_cursor) {
+      topics_array.push_back(
+          joined_topic_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["queues_list"] = queues_array;
+    response_object["topics_list"] = topics_array;
+    if ((login_user_query_result = GetLoginUserByUsername<const char* const>(
+        user_name))) {
+      response_object["token"] = login_user_query_result->view()["token"]
+          .get_utf8().value.to_string();
+    } else {
+      token.assign(GenerateToken(string(user_name) + GetTimeStamp(now)));
+      AddNewLoginRecord<const char* const, const string&>(user_name, token);
+      response_object["token"] = token;
+    }
   }
 }
 
