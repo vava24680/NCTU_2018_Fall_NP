@@ -21,6 +21,7 @@
 #include "botan-2/botan/hex.h"
 
 #include "nlohmann/json.hpp"
+#include "server_stomp_client.hpp"
 
 #define MONGODB_HOST "localhost"
 #define MONGODB_PORT "27018"
@@ -44,9 +45,12 @@ class Server {
   public:
     Server();
     Server(const char* IP, const char* port);
-    Server(const string& IP, const int port);
+    Server(const string& IP, const unsigned int& port, const string& mq_ip,
+           const unsigned int& mq_port);
     void Start();
     ~Server();
+  private:
+    ServerStompClient stomp_client;
   private:
     char* receive_buffer_;
     uint64_t counter_;
