@@ -21,7 +21,7 @@
 #include "botan-2/botan/hex.h"
 
 #include "nlohmann/json.hpp"
-#include "server_stomp_client.hpp"
+#include "server_amqp_client.hpp"
 
 #define MONGODB_HOST "localhost"
 #define MONGODB_PORT "27018"
@@ -50,7 +50,7 @@ class Server {
     void Start();
     ~Server();
   private:
-    ServerStompClient stomp_client;
+    ServerAMQPClient amqp_client;
   private:
     char* receive_buffer_;
     uint64_t counter_;

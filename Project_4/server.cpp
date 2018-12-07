@@ -109,7 +109,7 @@ void Server::Initial(void) {
   friendships_collection_ = mongodb_database[FRIENDSHIPS_COLLECTION];
   posts_collection_ = mongodb_database[POSTS_COLLECTION];
 
-  stomp_client.Run();
+  amqp_client.Run();
 }
 
 void Server::SendResponse(int* client_socket_file_descriptor) {
@@ -949,7 +949,10 @@ void Server::Send(char* instruction) {
   strtok(instruction, " ");
   token.assign(instruction, strlen(instruction));
   friend_name_in_c_string = strtok(NULL, " ");
-  message_in_c_string = strtok(NULL, " ");
+  if (friend_name_in_c_string) {
+    message_in_c_string = friend_name_in_c_string +
+      strlen(friend_name_in_c_string) + 1;
+  }
   response_object["status"] = 1;
 
   if (!CheckTokenExists(token)) {
@@ -981,7 +984,8 @@ void Server::Send(char* instruction) {
       response_object["status"] = 0;
       response_object["message"] = SUCCESS_MESSAGE;
 
-      stomp_client.PublishMessageToOneQueue(user_name, friend_name, message__);
+      amqp_client.PublishMessageToOnePrivateQueue(friend_name, user_name,
+                                                  message__);
     }
   }
 }
@@ -1149,9 +1153,8 @@ void Server::SendGroup(char* instruction) {
       response_object["message"] = SUCCESS_MESSAGE;
       message.assign(message_in_c_string, strlen(message_in_c_string));
       cout << "message:" << message << endl;
-      stomp_client.PublishMessageToOneTopic(user_name,
-                                            string(group_name_in_c_string),
-                                            message);
+      amqp_client.PublishMessageToOnePublicQueue(
+          string(group_name_in_c_string) + "_pub", user_name, message);
     }
   }
 }
@@ -1254,7 +1257,7 @@ Server::Server(const char* IP__, const char* port__)
 
 Server::Server(const string& IP, const unsigned int& port, const string& mq_ip,
                const unsigned int& mq_port) :
-    stomp_client{mq_ip, mq_port},
+    amqp_client{mq_ip, mq_port, "np_hw4_user", "np_hw4", "np_hw4"},
     blake2b_hash_{BLAKE2B_DIGEST_LENGTH},
     mongodb_instance{},
     mongodb_client{mongocxx::uri{MONGODB_URL}}
