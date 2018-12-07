@@ -993,6 +993,7 @@ void Server::Send(char* instruction) {
 void Server::CreateGroup(char* instruction) {
   cout << "In CreateGroup function" << endl;
   string token("");
+  string user_name;
   char* group_name_in_c_string = NULL;
 
   strtok(instruction, " ");
@@ -1011,9 +1012,13 @@ void Server::CreateGroup(char* instruction) {
     response_object["message"] = string(group_name_in_c_string)
         + " already exist";
   } else {
+    GetUsername(user_name);
     AfterLoginValidatedHandler();
     AddNewGroup<string>(string(group_name_in_c_string), true);
+    AddNewJoinedGroupRecord<const char* const, string>(group_name_in_c_string,
+                                                       user_name);
     response_object["status"] = 0;
+    response_object["topic"] = string(group_name_in_c_string);
     response_object["message"] = SUCCESS_MESSAGE;
   }
 }
