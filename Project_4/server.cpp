@@ -1159,7 +1159,7 @@ void Server::SendGroup(char* instruction) {
       message.assign(message_in_c_string, strlen(message_in_c_string));
       cout << "message:" << message << endl;
       amqp_client.PublishMessageToOnePublicQueue(
-          string(group_name_in_c_string) + "_pub", user_name, message);
+          string(group_name_in_c_string), user_name, message);
     }
   }
 }
