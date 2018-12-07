@@ -975,10 +975,13 @@ void Server::Send(char* instruction) {
     } else {
       AfterLoginValidatedHandler();
       message__.assign(message_in_c_string, strlen(message_in_c_string));
+      friend_name.assign(friend_name_in_c_string,
+                         strlen(friend_name_in_c_string));
       cout << message__ << endl;
       response_object["status"] = 0;
       response_object["message"] = SUCCESS_MESSAGE;
-      // Should pass message to MQ
+
+      stomp_client.PublishMessageToOneQueue(user_name, friend_name, message__);
     }
   }
 }
@@ -1108,7 +1111,49 @@ void Server::JoinGroup(char* instruction) {
 }
 
 void Server::SendGroup(char* instruction) {
+  cout << "In SendGroup function" << endl;
+  string token("");
+  string user_name("");
+  string message("");
+  char* token_in_c_string = NULL;
+  char* group_name_in_c_string = NULL;
+  char* message_in_c_string = NULL;
 
+  if ((token_in_c_string = strtok(instruction, " ")) != NULL)
+    token.assign(token_in_c_string, strlen(token_in_c_string));
+
+  group_name_in_c_string = strtok(NULL, " ");
+  if (group_name_in_c_string)
+    message_in_c_string = group_name_in_c_string + strlen(group_name_in_c_string) + 1;
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (!group_name_in_c_string || !message_in_c_string ||
+      !strlen(message_in_c_string)) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: send-group <user> <group> <message>";
+  } else if (!CheckGroupExists<const char* const>(group_name_in_c_string)) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = "No such group exist";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    if (!CheckJoinedGroupRelationshipExists<const char* const, string>(
+        group_name_in_c_string, user_name)) {
+      response_object["message"] = string("You are not the member of ").append(
+          group_name_in_c_string, strlen(group_name_in_c_string));
+    } else {
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+      message.assign(message_in_c_string, strlen(message_in_c_string));
+      cout << "message:" << message << endl;
+      stomp_client.PublishMessageToOneTopic(user_name,
+                                            string(group_name_in_c_string),
+                                            message);
+    }
+  }
 }
 
 void Server::MessageParsing(char* instruction, const time_t& now) {
