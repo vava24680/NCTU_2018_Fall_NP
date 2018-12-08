@@ -957,7 +957,7 @@ void Server::Send(char* instruction) {
 
   if (!CheckTokenExists(token)) {
     NotLoginHandler();
-  } else if ((!friend_name_in_c_string) || (!message_in_c_string)) {
+  } else if ((!friend_name_in_c_string) || (!strlen(message_in_c_string))) {
     AfterLoginValidatedHandler();
     InvalidInstructionFormatMessagePrinter();
     response_object["message"] = "Usage: send <user> <friend> <message>";
@@ -1138,8 +1138,7 @@ void Server::SendGroup(char* instruction) {
 
   if (!CheckTokenExists<string>(token)) {
     NotLoginHandler();
-  } else if (!group_name_in_c_string || !message_in_c_string ||
-      !strlen(message_in_c_string)) {
+  } else if (!group_name_in_c_string || !strlen(message_in_c_string)) {
     AfterLoginValidatedHandler();
     InvalidInstructionFormatMessagePrinter();
     response_object["message"] = "Usage: send-group <user> <group> <message>";
