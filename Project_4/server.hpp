@@ -124,6 +124,8 @@ class Server {
     template <class T>
       bool DeleteOneGroup(T group_name);
     template <class T>
+      unsigned int DeleteJoinedGroupRecordsByUsername(T user_name);
+    template <class T>
       bool DeleteLoginRecordByUsername(T user_name);
     template <class T>
       bool DeleteLoginRecordByToken(T token);

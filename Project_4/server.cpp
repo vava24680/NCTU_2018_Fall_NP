@@ -501,6 +501,17 @@ bool Server::DeleteOneGroup(T group_name) {
 }
 
 template <class T>
+unsigned int Server::DeleteJoinedGroupRecordsByUsername(T user_name) {
+  auto joined_group_records_deletion_filter =
+      bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto deletion_result = joined_groups_collection_.delete_many(
+      joined_group_records_deletion_filter.view());
+  return deletion_result->deleted_count();
+}
+
+template <class T>
 bool Server::DeleteLoginRecordByUsername(T user_name) {
   auto login_user_deletion_filter = bsoncxx::builder::stream::document()
       << "user_name" << user_name
@@ -671,6 +682,7 @@ void Server::Delete(char* instruction) {
     DeleteAllFriends<const string&>(user_name);
     DeleteAllPosts<const string&>(user_name);
     DeleteLoginRecordByToken<const string&>(token);
+    DeleteJoinedGroupRecordsByUsername<const string&>(user_name);
     DeleteUser<const string&>(user_name);
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
