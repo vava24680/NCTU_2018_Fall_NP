@@ -1,0 +1,6 @@
+RabbitMQ:
+    host: Server that run RabbitMQ
+    port: AMQP port that RabbitMQ listens to
+    virtual_host: VirtualHost
+    user: Username
+    password: Password
