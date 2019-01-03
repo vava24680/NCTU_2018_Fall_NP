@@ -1,0 +1,6 @@
+AWS_region:
+  region: ''
+
+AWS_credential:
+  aws_access_key_id: ''
+  aws_secret_key: ''

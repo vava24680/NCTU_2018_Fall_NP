@@ -21,6 +21,7 @@
 #include "botan-2/botan/hex.h"
 
 #include "nlohmann/json.hpp"
+#include "server_amqp_client.hpp"
 
 #define MONGODB_HOST "localhost"
 #define MONGODB_PORT "27018"
@@ -44,9 +45,12 @@ class Server {
   public:
     Server();
     Server(const char* IP, const char* port);
-    Server(const string& IP, const int port);
+    Server(const string& IP, const unsigned int& port, const string& mq_ip,
+           const unsigned int& mq_port);
     void Start();
     ~Server();
+  private:
+    ServerAMQPClient amqp_client;
   private:
     char* receive_buffer_;
     uint64_t counter_;
@@ -65,6 +69,8 @@ class Server {
     mongocxx::client mongodb_client;
     mongocxx::database mongodb_database;
     mongocxx::collection users_collection_;
+    mongocxx::collection groups_collection_;
+    mongocxx::collection joined_groups_collection_;
     mongocxx::collection login_users_collection_;
     mongocxx::collection invitations_collection_;
     mongocxx::collection friendships_collection_;
@@ -77,9 +83,15 @@ class Server {
     string GetTimeStamp(const time_t& now);
     void GetToken(const char* const instruction, string& token);
     template<class T>
-      bool CheckLogin(T token);
+      bool CheckTokenExists(T token);
+    template<class T>
+      bool CheckLoginByUsername(T user_name);
     template <class T>
       bool CheckUserExists(T user_name);
+    template <class T>
+      bool CheckGroupExists(T group_name);
+    template <class T, class U>
+      bool CheckJoinedGroupRelationshipExists(T group_name, U user_name);
     template <class T, class U>
       bool CheckInvitationExists(T inviter_user_name, U invitee_user_name);
     template <class T, class U>
@@ -95,6 +107,10 @@ class Server {
     void CreateCollection(const string& collection_name);
     template <class T>
       bool AddNewUser(T user_name, T password);
+    template <class T>
+      bool AddNewGroup(T group_name, bool is_public);
+    template <class T, class U>
+      bool AddNewJoinedGroupRecord(T group_name, U user_name);
     template <class T, class U>
       bool AddNewLoginRecord(T user_name, U password);
     template <class T, class U>
@@ -105,6 +121,10 @@ class Server {
       bool AddNewPost(T user_name, U message);
     template <class T>
       bool DeleteUser(T user_name);
+    template <class T>
+      bool DeleteOneGroup(T group_name);
+    template <class T>
+      unsigned int DeleteJoinedGroupRecordsByUsername(T user_name);
     template <class T>
       bool DeleteLoginRecordByUsername(T user_name);
     template <class T>
@@ -121,6 +141,10 @@ class Server {
     template <class T>
       bsoncxx::stdx::optional<bsoncxx::document::value> GetUser(
           T user_name);
+    mongocxx::cursor GetAllPublicGroups(void);
+    mongocxx::cursor GetAllPrivateGroups(void);
+    template <class T>
+      mongocxx::cursor GetAllJoinedGroupsOfUser(T user_name);
     template <class T>
       bsoncxx::stdx::optional<bsoncxx::document::value> GetLoginUserByUsername(
           T user_name);
@@ -146,6 +170,12 @@ class Server {
     void Invite(char* instruction);
     void AcceptInvite(char* instruction);
     void Post(char* instruction);
+    void Send(char* instruction);
+    void CreateGroup(char* instruction);
+    void ListGroup(char* instruction);
+    void ListJoined(char* instruction);
+    void JoinGroup(char* instruction);
+    void SendGroup(char* instruction);
     void MessageParsing(char* instruction, const time_t& now);
 };
 #endif
