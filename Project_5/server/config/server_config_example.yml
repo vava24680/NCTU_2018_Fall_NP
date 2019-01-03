@@ -1,0 +1,14 @@
+MONGO:
+  host: ''
+  port: 27017
+  user: ''
+  password: ''
+  database: ''
+
+RabbitMQ:
+  host: ''
+  port: 5672
+  virtual_host: ''
+  user: ''
+  password: ''
+  using_ssl: false
