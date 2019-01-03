@@ -32,6 +32,8 @@
 #include "nlohmann/json.hpp"
 
 #define USERS_COLLECTION "Users"
+#define GROUPS_COLLECTION "Groups"
+#define JOINED_GROUPS_COLLECTION "JoinedGroups"
 #define LOGIN_USERS_COLLECTION "LoginUsers"
 #define INVITATIONS_COLLECTION "Invitations"
 #define FRIENDSHIPS_COLLECTION "Friendships"
@@ -51,6 +53,12 @@
 #define INVITE 7
 #define ACCEPT_INVITE 8
 #define POST 9
+#define SEND 10
+#define CREATE_GROUP 11
+#define LIST_GROUP 12
+#define LIST_JOINED 13
+#define JOIN_GROUP 14
+#define SEND_GROUP 15
 
 #define SUCCESS_MESSAGE "Success!"
 #define NOT_LOGIN_MESSAGE "Not login yet"
@@ -77,19 +85,31 @@ void Server::Initial(void) {
       {"receive-post", RECEIVE_POST},
       {"invite", INVITE},
       {"accept-invite", ACCEPT_INVITE},
-      {"post", POST}
+      {"post", POST},
+      {"send", SEND},
+      {"create-group", CREATE_GROUP},
+      {"list-group", LIST_GROUP},
+      {"list-joined", LIST_JOINED},
+      {"join-group", JOIN_GROUP},
+      {"send-group", SEND_GROUP}
       });
   mongodb_database = mongodb_client[MONGODB_DATABASE];
   CreateCollection(USERS_COLLECTION);
+  CreateCollection(GROUPS_COLLECTION);
+  CreateCollection(JOINED_GROUPS_COLLECTION);
   CreateCollection(LOGIN_USERS_COLLECTION);
   CreateCollection(INVITATIONS_COLLECTION);
   CreateCollection(FRIENDSHIPS_COLLECTION);
   CreateCollection(POSTS_COLLECTION);
   users_collection_ = mongodb_database[USERS_COLLECTION];
+  groups_collection_ = mongodb_database[GROUPS_COLLECTION];
+  joined_groups_collection_ = mongodb_database[JOINED_GROUPS_COLLECTION];
   login_users_collection_ = mongodb_database[LOGIN_USERS_COLLECTION];
   invitations_collection_ = mongodb_database[INVITATIONS_COLLECTION];
   friendships_collection_ = mongodb_database[FRIENDSHIPS_COLLECTION];
   posts_collection_ = mongodb_database[POSTS_COLLECTION];
+
+  amqp_client.Run();
 }
 
 void Server::SendResponse(int* client_socket_file_descriptor) {
@@ -144,13 +164,23 @@ void Server::GetToken(const char* const instruction, string& token) {
 }
 
 template<class T>
-bool Server::CheckLogin(T token) {
+bool Server::CheckTokenExists(T token) {
   auto login_users_query_filter = bsoncxx::builder::stream::document()
       << "token" << token
       << bsoncxx::builder::stream::finalize;
   login_user_view_ = login_users_collection_.find_one(
       login_users_query_filter.view());
   return login_user_view_ && !token.empty() ? true : false;
+}
+
+template<class T>
+bool Server::CheckLoginByUsername(T user_name) {
+  auto login_user_query_filter = bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto login_user_query_result = login_users_collection_.find_one(
+      login_user_query_filter.view());
+  return (login_user_query_result) ? true : false;
 }
 
 template <class T>
@@ -160,6 +190,28 @@ bool Server::CheckUserExists(T user_name) {
       << bsoncxx::builder::stream::finalize;
   auto user_query_result = users_collection_.find_one(user_query_filter.view());
   return (user_query_result) ? true : false;
+}
+
+template<class T>
+bool Server::CheckGroupExists(T group_name) {
+  auto group_query_filter = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << bsoncxx::builder::stream::finalize;
+  auto group_query_result = groups_collection_.find_one(
+      group_query_filter.view());
+  return (group_query_result) ? true : false;
+}
+
+template <class T, class U>
+bool Server::CheckJoinedGroupRelationshipExists(T group_name, U user_name) {
+  auto joined_group_relationship_query_filter
+      = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto joined_group_relationship_query_result = joined_groups_collection_
+      .find_one(joined_group_relationship_query_filter.view());
+  return (joined_group_relationship_query_result) ? true : false;
 }
 
 template <class T, class U>
@@ -261,6 +313,28 @@ bool Server::AddNewUser(T user_name, T password) {
   return insert_one_result ? true : false;
 }
 
+template <class T>
+bool Server::AddNewGroup(T group_name, bool is_public) {
+  auto group_document = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "public" << is_public
+      << bsoncxx::builder::stream::finalize;
+  auto insert_one_result = groups_collection_.insert_one(
+      group_document.view());
+  return insert_one_result ? true : false;
+}
+
+template <class T, class U>
+bool Server::AddNewJoinedGroupRecord(T group_name, U user_name) {
+  auto joined_group_document = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto insert_one_result = joined_groups_collection_.insert_one(
+      joined_group_document.view());
+  return insert_one_result ? true : false;
+}
+
 template <class T, class U>
 bool Server::AddNewLoginRecord(T user_name, U token) {
   auto login_user_document = bsoncxx::builder::stream::document()
@@ -312,6 +386,28 @@ bsoncxx::stdx::optional<bsoncxx::document::value> Server::GetUser(
       << "user_name" << user_name
       << bsoncxx::builder::stream::finalize;
   return users_collection_.find_one(user_query_filter.view());
+}
+
+mongocxx::cursor Server::GetAllPublicGroups(void) {
+  auto public_groups_query_filter = bsoncxx::builder::stream::document()
+      << "public" << true
+      << bsoncxx::builder::stream::finalize;
+  return groups_collection_.find(public_groups_query_filter.view());
+}
+
+mongocxx::cursor Server::GetAllPrivateGroups(void) {
+  auto private_groups_query_filter = bsoncxx::builder::stream::document()
+      << "public" << false
+      << bsoncxx::builder::stream::finalize;
+  return groups_collection_.find(private_groups_query_filter.view());
+}
+
+template <class T>
+mongocxx::cursor Server::GetAllJoinedGroupsOfUser(T user_name) {
+  auto joined_groups_query_filter = bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  return joined_groups_collection_.find(joined_groups_query_filter.view());
 }
 
 template <class T>
@@ -392,6 +488,27 @@ bool Server::DeleteUser(T user_name) {
   auto deletion_result = users_collection_.delete_one(
       user_deletion_filter.view());
   return deletion_result->deleted_count() ? true : false;
+}
+
+template <class T>
+bool Server::DeleteOneGroup(T group_name) {
+  auto group_deletion_filter = bsoncxx::builder::stream::document()
+      << "group_name" << group_name
+      << bsoncxx::builder::stream::finalize;
+  auto deletion_result = groups_collection_.delete_one(
+      group_deletion_filter.view());
+  return deletion_result->deleted_count() ? true : false;
+}
+
+template <class T>
+unsigned int Server::DeleteJoinedGroupRecordsByUsername(T user_name) {
+  auto joined_group_records_deletion_filter =
+      bsoncxx::builder::stream::document()
+      << "user_name" << user_name
+      << bsoncxx::builder::stream::finalize;
+  auto deletion_result = joined_groups_collection_.delete_many(
+      joined_group_records_deletion_filter.view());
+  return deletion_result->deleted_count();
 }
 
 template <class T>
@@ -488,10 +605,11 @@ void Server::Register(char* instruction) {
     response_object["message"] = "Usage: register <id> <password>";
   } else if (CheckUserExists<const char* const>(user_name)) {
     response_object["message"] = string(user_name) + " is already used";
-  } else if(AddNewUser<const char* const>(user_name, password)) {
+  } else {
+    AddNewUser<const char* const>(user_name, password);
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
-  } else {}
+  }
 }
 
 void Server::Login(char* instruction, const time_t& now) {
@@ -516,18 +634,29 @@ void Server::Login(char* instruction, const time_t& now) {
         user_query_result->view(), password)) {
     cout << "Password didn't match" << endl;
     response_object["message"] = "No such user or password error";
-  } else if ((login_user_query_result =
-        GetLoginUserByUsername<const char* const>(user_name))) {
-    response_object["status"] = 0;
-    response_object["message"] = SUCCESS_MESSAGE;
-    response_object["token"] = 
-        login_user_query_result->view()["token"].get_utf8().value.to_string();
   } else {
-    token.assign(GenerateToken(string(user_name) + GetTimeStamp(now)));
-    AddNewLoginRecord<const char* const, const string&>(user_name, token);
+    JSON queues_array = JSON::array({string(user_name)});
+    JSON topics_array = JSON::array();
+    auto joined_topics_query_result_cursor = GetAllJoinedGroupsOfUser<string>(
+        string(user_name));
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
-    response_object["token"] = token;
+    for(auto joined_topic_document_view : joined_topics_query_result_cursor) {
+      topics_array.push_back(
+          joined_topic_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["queues_list"] = queues_array;
+    response_object["topics_list"] = topics_array;
+    if ((login_user_query_result = GetLoginUserByUsername<const char* const>(
+        user_name))) {
+      response_object["token"] = login_user_query_result->view()["token"]
+          .get_utf8().value.to_string();
+    } else {
+      token.assign(GenerateToken(string(user_name) + GetTimeStamp(now)));
+      AddNewLoginRecord<const char* const, const string&>(user_name, token);
+      response_object["token"] = token;
+    }
   }
 }
 
@@ -540,7 +669,7 @@ void Server::Delete(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -553,6 +682,7 @@ void Server::Delete(char* instruction) {
     DeleteAllFriends<const string&>(user_name);
     DeleteAllPosts<const string&>(user_name);
     DeleteLoginRecordByToken<const string&>(token);
+    DeleteJoinedGroupRecordsByUsername<const string&>(user_name);
     DeleteUser<const string&>(user_name);
     response_object["status"] = 0;
     response_object["message"] = SUCCESS_MESSAGE;
@@ -567,7 +697,7 @@ void Server::Logout(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -590,7 +720,7 @@ void Server::ListInvite(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")){
     AfterLoginValidatedHandler();
@@ -620,7 +750,7 @@ void Server::ListFriend(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")) {
     AfterLoginValidatedHandler();
@@ -660,7 +790,7 @@ void Server::ReceivePost(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (NULL != strtok(NULL, " ")) {
     AfterLoginValidatedHandler();
@@ -713,7 +843,7 @@ void Server::Invite(char* instruction) {
   strtok(instruction, " ") ? token.assign(instruction, strlen(instruction)) : token;
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else {
     AfterLoginValidatedHandler();
@@ -766,7 +896,7 @@ void Server::AcceptInvite(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else {
     AfterLoginValidatedHandler();
@@ -801,7 +931,7 @@ void Server::Post(char* instruction) {
   token.assign(instruction, strlen(instruction));
   response_object["status"] = 1;
 
-  if (!CheckLogin(token)) {
+  if (!CheckTokenExists(token)) {
     NotLoginHandler();
   } else if (instruction_length != token.length()) {
     AfterLoginValidatedHandler();
@@ -816,6 +946,232 @@ void Server::Post(char* instruction) {
     AfterLoginValidatedHandler();
     InvalidInstructionFormatMessagePrinter();
     response_object["message"] = "Usage: post <user> <message>";
+  }
+}
+
+void Server::Send(char* instruction) {
+  cout << "In Send function" << endl;
+  string token("");
+  string message__;
+  string user_name;
+  string friend_name;
+  char* friend_name_in_c_string = NULL;
+  char* message_in_c_string = NULL;
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  friend_name_in_c_string = strtok(NULL, " ");
+  if (friend_name_in_c_string) {
+    message_in_c_string = friend_name_in_c_string +
+      strlen(friend_name_in_c_string) + 1;
+  }
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists(token)) {
+    NotLoginHandler();
+  } else if ((!friend_name_in_c_string) || (!strlen(message_in_c_string))) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: send <user> <friend> <message>";
+  } else if (!CheckUserExists<string>(string(friend_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = "No such user exist";
+  } else {
+    GetUsername(user_name);
+    if (!CheckFriendshipExists<string, string>(user_name,
+        string(friend_name_in_c_string))) {
+      AfterLoginValidatedHandler();
+      response_object["message"] = string(friend_name_in_c_string)
+          + " is not your friend";
+    } else if(!CheckLoginByUsername<string>(string(friend_name_in_c_string))) {
+      AfterLoginValidatedHandler();
+      response_object["message"] = string(friend_name_in_c_string)
+          + " is not online";
+    } else {
+      AfterLoginValidatedHandler();
+      message__.assign(message_in_c_string, strlen(message_in_c_string));
+      friend_name.assign(friend_name_in_c_string,
+                         strlen(friend_name_in_c_string));
+      cout << message__ << endl;
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+
+      amqp_client.PublishMessageToOnePrivateQueue(friend_name, user_name,
+                                                  message__);
+    }
+  }
+}
+
+void Server::CreateGroup(char* instruction) {
+  cout << "In CreateGroup function" << endl;
+  string token("");
+  string user_name;
+  char* group_name_in_c_string = NULL;
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  group_name_in_c_string = strtok(NULL, " ");
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (!group_name_in_c_string || strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: create-group <user> <group>";
+  } else if (CheckGroupExists<string>(string(group_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = string(group_name_in_c_string)
+        + " already exist";
+  } else {
+    GetUsername(user_name);
+    AfterLoginValidatedHandler();
+    AddNewGroup<string>(string(group_name_in_c_string), true);
+    AddNewJoinedGroupRecord<const char* const, string>(group_name_in_c_string,
+                                                       user_name);
+    response_object["status"] = 0;
+    response_object["topic"] = string(group_name_in_c_string);
+    response_object["message"] = SUCCESS_MESSAGE;
+  }
+}
+
+void Server::ListGroup(char* instruction) {
+  cout << "In ListGroup function" << endl;
+  string token("");
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: list-group <user>";
+  } else {
+    JSON public_groups_array = JSON::array();
+    auto public_groups_query_result_cursor = GetAllPublicGroups();
+    response_object["status"] = 0;
+    for(auto&& public_group_document_view : public_groups_query_result_cursor) {
+      public_groups_array.push_back(
+          public_group_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["all-groups"] = public_groups_array;
+  }
+}
+
+void Server::ListJoined(char* instruction) {
+  cout << "In ListJoined function" << endl;
+  string token("");
+  string user_name("");
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ")) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: list-joined <user>";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    JSON joined_topics_array = JSON::array();
+    auto joined_topics_query_result_cursor = GetAllJoinedGroupsOfUser<string>(
+        user_name);
+    response_object["status"] = 0;
+    for(auto&& joined_topic_document_view : joined_topics_query_result_cursor) {
+      joined_topics_array.push_back(
+          joined_topic_document_view["group_name"].get_utf8()
+          .value.to_string());
+    }
+    response_object["all-joined-topics"] = joined_topics_array;
+  }
+}
+
+void Server::JoinGroup(char* instruction) {
+  cout << "In JoinGroup function" << endl;
+  string token("");
+  string user_name("");
+  char* group_name_in_c_string = NULL;
+
+  strtok(instruction, " ");
+  token.assign(instruction, strlen(instruction));
+  group_name_in_c_string = strtok(NULL, " ");
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (strtok(NULL, " ") || !group_name_in_c_string) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: join-group <user> <group>";
+  } else if (!CheckGroupExists<string>(string(group_name_in_c_string))) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = string(group_name_in_c_string)
+        + " does not exist";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    if (CheckJoinedGroupRelationshipExists<string, string>(
+          string(group_name_in_c_string), user_name)) {
+      response_object["message"] = "Already a member of "
+          + string(group_name_in_c_string);
+    } else {
+      AddNewJoinedGroupRecord<string, string>(
+          string(group_name_in_c_string), user_name);
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+      response_object["topic"] = string(group_name_in_c_string);
+    }
+  }
+}
+
+void Server::SendGroup(char* instruction) {
+  cout << "In SendGroup function" << endl;
+  string token("");
+  string user_name("");
+  string message("");
+  char* token_in_c_string = NULL;
+  char* group_name_in_c_string = NULL;
+  char* message_in_c_string = NULL;
+
+  if ((token_in_c_string = strtok(instruction, " ")) != NULL)
+    token.assign(token_in_c_string, strlen(token_in_c_string));
+
+  group_name_in_c_string = strtok(NULL, " ");
+  if (group_name_in_c_string)
+    message_in_c_string = group_name_in_c_string + strlen(group_name_in_c_string) + 1;
+  response_object["status"] = 1;
+
+  if (!CheckTokenExists<string>(token)) {
+    NotLoginHandler();
+  } else if (!group_name_in_c_string || !strlen(message_in_c_string)) {
+    AfterLoginValidatedHandler();
+    InvalidInstructionFormatMessagePrinter();
+    response_object["message"] = "Usage: send-group <user> <group> <message>";
+  } else if (!CheckGroupExists<const char* const>(group_name_in_c_string)) {
+    AfterLoginValidatedHandler();
+    response_object["message"] = "No such group exist";
+  } else {
+    AfterLoginValidatedHandler();
+    GetUsername(user_name);
+    if (!CheckJoinedGroupRelationshipExists<const char* const, string>(
+        group_name_in_c_string, user_name)) {
+      response_object["message"] = string("You are not the member of ").append(
+          group_name_in_c_string, strlen(group_name_in_c_string));
+    } else {
+      response_object["status"] = 0;
+      response_object["message"] = SUCCESS_MESSAGE;
+      message.assign(message_in_c_string, strlen(message_in_c_string));
+      cout << "message:" << message << endl;
+      amqp_client.PublishMessageToOnePublicQueue(
+          string(group_name_in_c_string), user_name, message);
+    }
   }
 }
 
@@ -862,6 +1218,24 @@ void Server::MessageParsing(char* instruction, const time_t& now) {
       case POST:
         Post(instruction + strlen(command) + 1);
         break;
+      case SEND:
+        Send(instruction + strlen(command) + 1);
+        break;
+      case CREATE_GROUP:
+        CreateGroup(instruction + strlen(command) + 1);
+        break;
+      case LIST_GROUP:
+        ListGroup(instruction + strlen(command) + 1);
+        break;
+      case LIST_JOINED:
+        ListJoined(instruction + strlen(command) + 1);
+        break;
+      case JOIN_GROUP:
+        JoinGroup(instruction + strlen(command) + 1);
+        break;
+      case SEND_GROUP:
+        SendGroup(instruction + strlen(command) + 1);
+        break;
       default:
         cout << "Unrecognized command" << endl;
         response_object.clear();
@@ -897,8 +1271,10 @@ Server::Server(const char* IP__, const char* port__)
   Initial();
 }
 
-Server::Server(const string& IP, const int port)
-    : blake2b_hash_{BLAKE2B_DIGEST_LENGTH},
+Server::Server(const string& IP, const unsigned int& port, const string& mq_ip,
+               const unsigned int& mq_port) :
+    amqp_client{mq_ip, mq_port, "np_hw4_user", "np_hw4", "np_hw4"},
+    blake2b_hash_{BLAKE2B_DIGEST_LENGTH},
     mongodb_instance{},
     mongodb_client{mongocxx::uri{MONGODB_URL}}
   {
