@@ -1,0 +1,6 @@
+RabbitMQ:
+    host: npaws.haohao.in
+    port: 5672
+    virtual_host: np_hw5
+    user: np_hw5_user
+    password: np_hw5
